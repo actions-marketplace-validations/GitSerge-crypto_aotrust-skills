@@ -1,5 +1,6 @@
 # AOTrust — Cryptographic Proof of Existence for AI Agents
 
+[![Official MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.GitSerge--crypto%2Faotrust--notary-2f6feb)](https://registry.modelcontextprotocol.io/v0/servers?search=aotrust)
 [![M8ven Score](https://m8ven.ai/badge/mcp/gitserge-crypto-aotrust-skills-g3hz21?v=0f2c915f775a2efe4292a97d389f921c)](https://m8ven.ai/mcp/gitserge-crypto-aotrust-skills-g3hz21)
 [![Protected by AOTrust](https://img.shields.io/badge/AOTrust-Notarized-0ea5e9)](https://verify.aotrust.link/s/40aefae4)
 ![Mainnet Live](https://img.shields.io/badge/mainnet-LIVE-brightgreen)
@@ -25,7 +26,22 @@ plan/patch/release checkpoints — free tier, no account:
 Cline, and any MCP client, plus a copy-paste `AGENTS.md` block
 (`Provenance: <Shield ID>` in commits).
 
+## Authorship Claims (bilateral signatures)
+
+Beyond agent workflows, AOTrust supports **bilateral PDRs (v0x04)**: the
+artifact is signed by **you** (Ed25519) *and* countersigned by the notary —
+a binding hash ties your public key to the content. This turns "I wrote/published
+this first" into a verifiable claim for **any digital artifact**: manuscripts,
+designs, photos, research notes, legal correspondence. Verification is public
+at https://verify.aotrust.link — no account, no software install for the reader.
+Signing guide (Ed25519, NEP-413): [SKILL.md → Bilateral Signature](aotrust-notarize/SKILL.md#bilateral-signature-optional-v0x04).
+See [pdr-spec.md](pdr-spec.md) §v2.4 for the binding-hash construction.
+
 ## Quickstart
+
+**Prefer one-click?** See [INTEGRATIONS.md](INTEGRATIONS.md) — ready MCP configs for
+Cursor, Windsurf, Cline, Claude Desktop, plus a "notarize before commit" rule for your
+assistant and LangChain/CrewAI examples.
 
 ```bash
 # 1. Compute SHA-256 hash of your artifact
@@ -54,6 +70,56 @@ Endpoints:
 - MCP: `https://api.aotrust.link/mcp`
 - Verify: `https://verify.aotrust.link`
 - Docs: `https://docs.aotrust.link`
+
+## Verify API (public, embeddable)
+
+Verification is a **standalone public API** — no account, no rate limits, no
+payment. Embed it in your product (dashboards, audit tools, escrow flows)
+or call it from the terminal:
+
+```bash
+# Verify a PDR (base64url-encoded bundle):
+curl https://api.aotrust.link/v1/pdr/verify/<pdr_b64url>
+# → {"valid": true, "checks": {...}, "error": null}
+
+# Look up a PDR by Shield ID (8 hex chars):
+curl https://api.aotrust.link/v1/shield/lookup/<shield_id>
+# → {"found": true, "pdr_b64": "...", "shield_id": "..."}
+
+# Get the notary public key for offline verification:
+curl https://api.aotrust.link/v1/notary/pubkey
+```
+
+Prefer full offline trust? [pdr_parser.py](pdr_parser.py) verifies any PDR
+locally — zero dependencies, no network, no trust in our servers.
+
+### Offline Merkle verification (anchored receipts)
+
+Anchored PDRs carry the daily Merkle root committed on-chain in the NEAR
+contract `notary-node.near` — readable from **any public NEAR RPC**, forever,
+independent of our servers. The verify API returns `merkle_proof`,
+`merkle_index`, `merkle_leaf` and `merkle_tree_size` for anchored PDRs.
+**Save the verify JSON response** — then verify it forever, offline:
+
+```bash
+# (once) save the verify response when the receipt is fresh:
+curl https://api.aotrust.link/v1/pdr/verify/<pdr_b64url> > verify.json
+
+# (any time, no AOTrust server needed) check inclusion:
+python3 verify_merkle_inclusion.py \
+  --leaf <merkle_leaf> --proof <comma-joined merkle_proof> \
+  --index <merkle_index> --root <merkle_root> \
+  --tree-size <merkle_tree_size>
+# → VALID
+
+# the root can always be re-checked against the chain itself via any
+# NEAR RPC: contract notary-node.near, method get_root({"seq": N})
+```
+
+[verify_merkle_inclusion.py](verify_merkle_inclusion.py) is standalone and
+zero-dependency (RFC 9162 §2.1.3.2 walk, same hashing as the anchoring
+engine). `tree_size` must be taken from the verify response (or a published
+anchor snapshot), not chosen by the verifier.
 
 ## PDR Specification & Tools
 
